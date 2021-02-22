@@ -1,0 +1,30 @@
+<html>
+<script src="jquery-3.5.1.min.js"></script>
+<script>
+function sum(list) {
+        return list.reduce((total, arg) => total + arg, 0);
+}
+
+$.getJSON("https://api.dydx.exchange/v1/historical-funding-rates?market=PBTC-USDC&limit=100", function(data) {
+    window.funding=data;
+    let history=funding['WETH-PUSD']['history'].map(element => {return parseFloat(element['fundingRate8Hr'])});
+    console.log(history);
+    let afr_1day = Math.round(sum(history.slice(-3)) / 3 * 3 * 365 * 100);
+    let afr_7day = Math.round(sum(history.slice(-3*7)) / (3*7) * 3 * 365 * 100);
+    let afr_30day = Math.round(sum(history.slice(-3*30)) / (3*30) * 3 * 365 * 100);
+    console.log(afr_1day);
+    console.log(afr_7day);
+    console.log(afr_30day);
+    $('#afr_1d').text(afr_1day);
+    $('#afr_7d').text(afr_7day);
+    $('#afr_30d').text(afr_30day);
+
+});
+</script>
+<body>
+    <p>dydx ETH-USD funding</p>
+    <p>APR 1-day <label id='afr_1d'></label>%</p>
+    <p>APR 7-day <label id='afr_7d'></label>%</p>
+    <p>APR 30-day <label id='afr_30d'></label>%</p>
+</body>
+</html>
