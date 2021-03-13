@@ -25,11 +25,16 @@ def main():
 
     s = Session()
 
-    today = datetime.datetime.today().replace(hour=8, minute=0, second=0, microsecond=0) # utc 00:00
-    yesterday = today - datetime.timedelta(days=1)
-    today = today - datetime.timedelta(seconds=1)
-    start_time = int((datetime.datetime.strptime(args.start, '%Y%m%d') if args.start else yesterday).timestamp())
-    end_time = int((datetime.datetime.strptime(args.end, '%Y%m%d') if args.end else today).timestamp())
+    if args.end:
+        end_dt = datetime.datetime.strptime(args.end, '%Y%m%d')
+    else:
+        end_dt = datetime.datetime.now()
+    if args.start:
+        start_dt = datetime.datetime.strptime(args.start, '%Y%m%d')
+    else:
+        start_dt = end_dt - datetime.timedelta(days=1)
+    start_time = int(start_dt.timestamp())
+    end_time = int(end_dt.timestamp())
     ts = int(time.time() * 1000)
     future = f'{args.token.upper()}-PERP'
 
