@@ -1,0 +1,4 @@
+requests
+PyMySQL
+iso8601
+python-telegram-bot

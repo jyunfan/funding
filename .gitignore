@@ -140,4 +140,6 @@ cython_debug/
 
 # credentials
 src/python/ftx.json
+src/python/mysql.json
+.*.swp
 
