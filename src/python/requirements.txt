@@ -2,3 +2,8 @@ requests
 PyMySQL
 iso8601
 python-telegram-bot
+cryptofeed
+dydx-v3-python
+bscscan-python
+attrdict
+
