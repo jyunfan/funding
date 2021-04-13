@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # pylint: disable=C0116
 
+# TODO help
+
 import argparse
 import datetime
 import json
@@ -100,7 +102,10 @@ def binance_funding(symbol):
 
 DYDXL1_MARKETS = {'btc':'PBTC-USDC', 'eth':'WETH-PUSD'}
 def dydxL1_funding(symbol):
-    symbols = [symbol] if symbol in DYDXL1_MARKETS else ['btc', 'eth']
+    if symbol:
+        symbols = [symbol] if symbol in DYDXL1_MARKETS else []
+    else:
+        symbols = ['btc', 'eth']
     r = req(f"https://api.dydx.exchange/v1/historical-funding-rates")
     rates = []
     for symbol in symbols:
@@ -110,7 +115,10 @@ def dydxL1_funding(symbol):
     return rates
 
 def dydx_funding(symbol):
-    symbols = [symbol] if symbol in DYDXL1_MARKETS else ['btc', 'eth']
+    if symbol:
+        symbols = [symbol] if symbol in DYDXL1_MARKETS else []
+    else:
+        symbols = ['btc', 'eth']
     rates = []
     for symbol in symbols:
         r = req(f"https://api.dydx.exchange/v3/historical-funding/{symbol.upper()}-USD")
