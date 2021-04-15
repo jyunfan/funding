@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 config = ad(json.load(open("config.json")))
 
 
-def ftx_funding(symbol):
+def ftx_funding(symbol, whitelist):
     if symbol:
         r = req(f"https://ftx.com/api/funding_rates?future={symbol.upper()}-PERP")
         if r.success:
@@ -58,18 +58,21 @@ def ftx_funding(symbol):
                     samples.setdefault(symbol, []).append(i.rate)
             rates = []
             for symbol in samples:
+                if symbol not in whitelist:
+                    logger.info(f"skip {symbol}")
+                    continue
                 rate = sum(samples[symbol]) / len(samples[symbol]) * 24 * 365
                 rates.append(ad(exchange='ftx', symbol=symbol, rate=rate))
             top = sorted(rates, key=lambda i:-i.rate)[:10]
             rates = []
             for i in top:
-                rates += ftx_funding(i.symbol)
+                rates += ftx_funding(i.symbol, whitelist)
                 time.sleep(0.1)
             return rates
         else:
             return []
 
-def binance_funding(symbol):
+def binance_funding(symbol, whitelist):
     if symbol:
         r = req(f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol.upper()}USDT")
         if r:
@@ -88,12 +91,15 @@ def binance_funding(symbol):
                     samples.setdefault(symbol, []).append(float(i.fundingRate))
             rates = []
             for symbol in samples:
+                if symbol not in whitelist:
+                    logger.info(f"skip {symbol}")
+                    continue
                 rate = sum(samples[symbol]) / len(samples[symbol]) * 3 * 365
                 rates.append(ad(exchange='binance', symbol=symbol, rate=rate))
             top = sorted(rates, key=lambda i:-i.rate)[:10]
             rates = []
             for i in top:
-                rates += binance_funding(i.symbol)
+                rates += binance_funding(i.symbol, whitelist)
                 time.sleep(0.1)
             return rates
         else:
@@ -101,7 +107,7 @@ def binance_funding(symbol):
 
 
 DYDXL1_MARKETS = {'btc':'PBTC-USDC', 'eth':'WETH-PUSD'}
-def dydxL1_funding(symbol):
+def dydxL1_funding(symbol, whitelist):
     if symbol:
         symbols = [symbol] if symbol in DYDXL1_MARKETS else []
     else:
@@ -114,11 +120,13 @@ def dydxL1_funding(symbol):
         rates.append(ad(exchange='dydxL1', symbol=symbol, rate=rate))
     return rates
 
-def dydx_funding(symbol):
+
+DYDX_MARKETS = ['btc', 'eth', 'uni', 'aave', 'link']
+def dydx_funding(symbol, whitelist):
     if symbol:
-        symbols = [symbol] if symbol in DYDXL1_MARKETS else []
+        symbols = [symbol] if symbol in DYDX_MARKETS else []
     else:
-        symbols = ['btc', 'eth']
+        symbols = DYDX_MARKETS
     rates = []
     for symbol in symbols:
         r = req(f"https://api.dydx.exchange/v3/historical-funding/{symbol.upper()}-USD")
@@ -126,14 +134,16 @@ def dydx_funding(symbol):
         rates.append(ad(exchange='dydx', symbol=symbol, rate=rate))
     return rates
 
+
 EXCHANGES = {
     'ftx': ftx_funding,
     'binance': binance_funding,
     'dydx': dydx_funding,
-    'dydxL1': dydxL1_funding,
+    #'dydxL1': dydxL1_funding,
 }
 
-def funding_command(update: Update, _: CallbackContext) -> None:
+
+def funding_command(update: Update, ctx: CallbackContext) -> None:
     logger.info(update.message.text)
     args = update.message.text.split()[1:]
     exchanges = [i for i in args if i in EXCHANGES] or EXCHANGES.keys()
@@ -141,15 +151,27 @@ def funding_command(update: Update, _: CallbackContext) -> None:
     rates = []
     for exchange in exchanges:
         for symbol in symbols:
-            rates += EXCHANGES[exchange](symbol)
+            rates += EXCHANGES[exchange](symbol, ctx.bot_data['whitelist'])
     rates = sorted(rates, key=lambda r:-r.rate)[:10]
     rows = []
     for r in rates:
         rows.append((r.symbol.upper(), r.exchange, f"{round(r.rate * 100, 2)}%"))
     w = [max(len(r) for r in c) for c in zip(*rows)]
     message = '24hr funding rates: \(APR\)\n'
-    message += '\n'.join(f'`{r[0]:{w[0]}} {r[1]:{w[1]}} {r[2]:{w[2]}}`' for r in rows)
+    message += '\n'.join(f'`{r[0]:{w[0]}} {r[1]:{w[1]}} {r[2]:>{w[2]}}`' for r in rows)
     update.message.reply_text(message, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+
+
+def apy_command(update: Update, _: CallbackContext) -> None:
+    logger.info(update.message.text)
+    apy = float(update.message.text.split()[1].replace('%','')) / 100
+    apr = ((apy+1)**(1/365)-1)*365
+    update.message.reply_text(f"{round(apy*100,2)}% APY = {round(apr*100,2)}% APR compound daily")
+
+
+def update_markets(ctx: CallbackContext):
+    markets = req('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=30')
+    ctx.bot_data['whitelist'] = {i.symbol.lower() for i in markets}
 
 
 def main() -> None:
@@ -157,6 +179,8 @@ def main() -> None:
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("funding", funding_command))
     dispatcher.add_handler(CommandHandler("f", funding_command))
+    dispatcher.add_handler(CommandHandler("apy", apy_command))
+    updater.job_queue.run_repeating(update_markets, interval=3600, first=1)
     updater.start_polling()
     updater.idle()
 
