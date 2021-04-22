@@ -2,6 +2,10 @@
 # pylint: disable=C0116
 
 # TODO help
+# TODO stem chart
+# TODO 72hr
+# TODO 1h 24h 7d
+# TODO persistent
 
 import argparse
 import datetime
@@ -81,7 +85,7 @@ def binance_funding(symbol, whitelist):
         else:
             return []
     else:
-        r = req(f"https://fapi.binance.com/fapi/v1/fundingRate")
+        r = req(f"https://fapi.binance.com/fapi/v1/fundingRate?limit=1000")
         if r:
             samples = {}
             t = yesterday().timestamp() * 1000
@@ -121,15 +125,16 @@ def dydxL1_funding(symbol, whitelist):
     return rates
 
 
-DYDX_MARKETS = ['btc', 'eth', 'uni', 'aave', 'link']
 def dydx_funding(symbol, whitelist):
+    r = req(f"https://api.dydx.exchange/v3/markets")
+    markets = {i['baseAsset'].lower(): m for m, i in r.markets.items()}
     if symbol:
-        symbols = [symbol] if symbol in DYDX_MARKETS else []
+        symbols = [symbol] if symbol in markets else []
     else:
-        symbols = DYDX_MARKETS
+        symbols = list(markets.keys())
     rates = []
     for symbol in symbols:
-        r = req(f"https://api.dydx.exchange/v3/historical-funding/{symbol.upper()}-USD")
+        r = req(f"https://api.dydx.exchange/v3/historical-funding/{markets[symbol]}")
         rate = sum(float(i.rate) for i in r.historicalFunding[:24]) * 365
         rates.append(ad(exchange='dydx', symbol=symbol, rate=rate))
     return rates
@@ -170,7 +175,7 @@ def apy_command(update: Update, _: CallbackContext) -> None:
 
 
 def update_markets(ctx: CallbackContext):
-    markets = req('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=30')
+    markets = req('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=50')
     ctx.bot_data['whitelist'] = {i.symbol.lower() for i in markets}
 
 
